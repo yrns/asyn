@@ -5,21 +5,29 @@ use funutd::Rnd;
 pub mod osc;
 pub mod play;
 
-// #[derive(Copy, Clone, Default)]
-// pub struct Pitch {
-//     frequency: f32,
-//     frequence_sweep: f32,
-//     frequence_delta_sweep: f32,
-//     vibrato_depth: f32,
-//     vibrato_frequency: f32,
-//     repeat_frequency: f32,
-//     frequency_jump1: (f32, f32),
-//     frequency_jump2: (f32, f32),
-// }
+#[derive(Copy, Clone, Default)]
+pub struct Pitch {
+    pub frequency: f32,
+    pub frequency_sweep: f32,
+    pub frequency_delta_sweep: f32,
+    pub vibrato_depth: f32,
+    pub vibrato_frequency: f32,
+    pub repeat_frequency: f32,
+    pub frequency_jump1: (f32, f32),
+    pub frequency_jump2: (f32, f32),
+}
+
+impl Pitch {
+    pub fn to_net(self, len1: f32) -> Net32 {
+        wrap(lfo(move |t| {
+            self.frequency + self.frequency_sweep * t * len1
+        }))
+    }
+}
 
 flags! {
     #[derive(Default)]
-    enum Waveform: u32 {
+    pub enum Waveform: u32 {
         #[default]
         Sine,
         Triangle,
@@ -44,11 +52,11 @@ impl Waveform {
 
 #[derive(Clone, Default)]
 pub struct Tone {
-    waveform: Waveform,
-    square_duty: f32,
-    square_duty_sweep: f32,
-    _harmonics: u32,
-    _harmonics_falloff: f32,
+    pub waveform: Waveform,
+    pub square_duty: f32,
+    pub square_duty_sweep: f32,
+    pub harmonics: u32,
+    pub harmonics_falloff: f32,
 }
 
 impl Tone {
@@ -80,17 +88,25 @@ impl Tone {
 
 #[derive(Copy, Clone, Default)]
 pub struct Amplitude {
-    attack: f32,
-    sustain: f32,
-    punch: f32,
-    decay: f32,
-    // tremolo_depth: f32,
-    // tremolo_frequency: f32,
+    pub attack: f32,
+    pub sustain: f32,
+    pub punch: f32,
+    pub decay: f32,
+    pub tremolo_depth: f32,
+    pub tremolo_frequency: f32,
 }
 
 impl Amplitude {
     pub fn len(&self) -> f32 {
         self.attack + self.sustain + self.decay
+    }
+
+    pub fn to_net(self) -> Net32 {
+        let mut a = wrap(lfo(move |t| aspd(self, t)));
+        if self.tremolo_depth > 0.0 {
+            a = a * tremolo(self.tremolo_depth, self.tremolo_frequency);
+        }
+        a
     }
 }
 
@@ -127,10 +143,6 @@ pub fn tremolo(
     1.0 - (depth * (0.5 + 0.5 * (constant(frequency) >> cosine())))
 }
 
-// pub fn amplitude() -> (impl AudioUnit32, f32) {
-//     todo!()
-// }
-
 pub fn wrap(unit: impl AudioUnit32 + 'static) -> Net32 {
     let unit: Box<dyn AudioUnit32> = Box::new(unit);
     Net32::wrap(unit)
@@ -139,7 +151,7 @@ pub fn wrap(unit: impl AudioUnit32 + 'static) -> Net32 {
 pub fn jump(seed: u32) -> (Net32, f32) {
     let mut rng = Rnd::from_u32(seed);
 
-    let a = Amplitude {
+    let amplitude = Amplitude {
         sustain: rng.f32_in(0.02, 0.1),
         decay: rng.f32_in(0.05, 0.4),
         punch: match rng.bool(0.5) {
@@ -149,11 +161,15 @@ pub fn jump(seed: u32) -> (Net32, f32) {
         ..Default::default()
     };
 
-    let len1 = 1.0 / a.len();
+    let len = amplitude.len();
+    let len1 = 1.0 / len;
 
-    let frequency = rng.f32_in(100.0, 2000.0);
-    let frequency_sweep = rng.f32_in(200.0, 2000.0);
-    let pitch = wrap(lfo(move |t| frequency + frequency_sweep * t * len1));
+    let pitch = Pitch {
+        frequency: rng.f32_in(100.0, 2000.0),
+        frequency_sweep: rng.f32_in(200.0, 2000.0),
+        ..Default::default()
+    }
+    .to_net(len1);
 
     let tone = Tone {
         waveform: Waveform::pick(
@@ -165,10 +181,7 @@ pub fn jump(seed: u32) -> (Net32, f32) {
         ..Default::default()
     };
 
-    //let tremolo = tremolo(a.tremolo_depth, a.tremolo_frequency);
-    let amplitude = wrap(lfo(move |t| aspd(a, t))); // * tremolo;
-
-    let mut jump = pitch >> tone.to_net(len1) * amplitude;
+    let mut jump = pitch >> tone.to_net(len1) * amplitude.to_net();
 
     // Flanger. Make feedback a parameter?
     match rng.bool(0.3) {
@@ -206,7 +219,7 @@ pub fn jump(seed: u32) -> (Net32, f32) {
         _ => (),
     }
 
-    (jump, a.len())
+    (jump, len)
 }
 
 #[cfg(test)]
