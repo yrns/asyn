@@ -1,3 +1,4 @@
+use flagset::{flags, FlagSet};
 use fundsp::hacker32::*;
 use funutd::Rnd;
 
@@ -15,6 +16,67 @@ pub mod play;
 //     frequency_jump1: (f32, f32),
 //     frequency_jump2: (f32, f32),
 // }
+
+flags! {
+    #[derive(Default)]
+    enum Waveform: u32 {
+        #[default]
+        Sine,
+        Triangle,
+        Saw,
+        Square,
+        Tangent,
+        Whistle,
+        Breaker,
+        White,
+        Pink,
+        Brown,
+    }
+}
+
+impl Waveform {
+    /// Pick a random waveform from the specified set.
+    pub fn pick(set: FlagSet<Waveform>, rng: &mut Rnd) -> Self {
+        let i = rng.u32_to(set.into_iter().count() as u32) as usize;
+        set.into_iter().nth(i).unwrap()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct Tone {
+    waveform: Waveform,
+    square_duty: f32,
+    square_duty_sweep: f32,
+    _harmonics: u32,
+    _harmonics_falloff: f32,
+}
+
+impl Tone {
+    pub fn to_net(self, len1: f32) -> Net32 {
+        match self.waveform {
+            Waveform::Sine => wrap(sine()),
+            Waveform::Triangle => wrap(osc::triangle()),
+            Waveform::Saw => wrap(osc::saw()),
+            Waveform::Square => {
+                // Duty sweep should repeat w/ the frequency repeat...
+                let duty = wrap(lfo(move |t| {
+                    lerp(
+                        0.01,
+                        0.99,
+                        self.square_duty + self.square_duty_sweep * t * len1,
+                    )
+                }));
+                (pass() | duty) >> osc::square()
+            }
+            Waveform::Tangent => wrap(osc::tangent()),
+            Waveform::Whistle => wrap(osc::whistle()),
+            Waveform::Breaker => wrap(osc::breaker()),
+            Waveform::White => wrap(white()),
+            Waveform::Pink => wrap(pink()),
+            Waveform::Brown => wrap(brown()),
+        }
+    }
+}
 
 #[derive(Copy, Clone, Default)]
 pub struct Amplitude {
@@ -93,27 +155,20 @@ pub fn jump(seed: u32) -> (Net32, f32) {
     let frequency_sweep = rng.f32_in(200.0, 2000.0);
     let pitch = wrap(lfo(move |t| frequency + frequency_sweep * t * len1));
 
-    let jump = match rng.u32_to(4) {
-        0 => pitch >> sine(),
-        1 => {
-            let square_duty = 0.50;
-            let square_duty_sweep = 0.0;
-
-            // Duty sweep should repeat w/ the frequency repeat...
-            let duty = wrap(lfo(move |t| {
-                lerp(0.01, 0.99, square_duty + square_duty_sweep * t * len1)
-            }));
-            (pitch | duty) >> osc::square()
-        }
-        2 => pitch >> osc::whistle(),
-        3 => pitch >> osc::breaker(),
-        _ => unimplemented!(),
+    let tone = Tone {
+        waveform: Waveform::pick(
+            Waveform::Sine | Waveform::Square | Waveform::Whistle | Waveform::Breaker,
+            &mut rng,
+        ),
+        square_duty: rng.f32_in(0.0, 100.0),
+        square_duty_sweep: rng.f32_in(-100.0, 100.0),
+        ..Default::default()
     };
 
     //let tremolo = tremolo(a.tremolo_depth, a.tremolo_frequency);
     let amplitude = wrap(lfo(move |t| aspd(a, t))); // * tremolo;
 
-    let mut jump = jump * amplitude;
+    let mut jump = pitch >> tone.to_net(len1) * amplitude;
 
     // Flanger. Make feedback a parameter?
     match rng.bool(0.3) {

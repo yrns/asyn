@@ -11,5 +11,6 @@ fundsp = { version = "0.13.0" }
 funutd = "0.11.0"
 cpal = "0.15.2"
 numeric-array = { version = "0.5.2", default-features = false }
+flagset = "0.4.3"
 
 # [dev-dependencies]
