@@ -53,6 +53,7 @@ impl Waveform {
 #[derive(Clone, Default)]
 pub struct Tone {
     pub waveform: Waveform,
+    pub interpolate_noise: bool,
     pub square_duty: f32,
     pub square_duty_sweep: f32,
     pub harmonics: u32,
@@ -79,7 +80,7 @@ impl Tone {
             Waveform::Tangent => wrap(osc::tangent()),
             Waveform::Whistle => wrap(osc::whistle()),
             Waveform::Breaker => wrap(osc::breaker()),
-            Waveform::White => wrap(osc::white(true)),
+            Waveform::White => wrap(osc::white(self.interpolate_noise)),
             Waveform::Pink => wrap(pink()),
             Waveform::Brown => wrap(brown()),
         }
@@ -266,7 +267,7 @@ pub fn explosion(seed: u32) -> (Net32, f32) {
     let tone = Tone {
         //waveform: Waveform::pick(Waveform::White | Waveform::Pink | Waveform::Brown, &mut rng),
         waveform: Waveform::White,
-        // interpolate_noise: ??
+        interpolate_noise: rng.bool(0.5),
         ..Default::default()
     };
 
@@ -325,7 +326,7 @@ mod tests {
         //let mut jump = (constant(22.0) | constant(0.5)) >> harmonic(osc::square(), 3, 0.5);
 
         //let mut jump = sine_hz(110.0) >> map(|i: &Frame<f32, U1>| dbg!(i[0]));
-        let (mut jump, len) = jump(0);
+        let (mut jump, len) = explosion(0);
 
         //let len = 0.1;
         //let mut jump = dc(220.0 / DEFAULT_SR as f32) >> resample(white());
