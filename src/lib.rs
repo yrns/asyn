@@ -81,8 +81,10 @@ impl Tone {
             Waveform::Whistle => wrap(osc::whistle()),
             Waveform::Breaker => wrap(osc::breaker()),
             Waveform::White => wrap(osc::white(self.interpolate_noise)),
-            Waveform::Pink => wrap(pink()),
-            Waveform::Brown => wrap(brown()),
+            Waveform::Pink => wrap(osc::white(self.interpolate_noise) >> pinkpass()),
+            Waveform::Brown => {
+                wrap(osc::white(self.interpolate_noise) >> lowpole_hz(10.0) * dc(13.7))
+            }
         }
     }
 }
@@ -265,8 +267,7 @@ pub fn explosion(seed: u32) -> (Net32, f32) {
     let mut rng = Rnd::from_u32(seed);
 
     let tone = Tone {
-        //waveform: Waveform::pick(Waveform::White | Waveform::Pink | Waveform::Brown, &mut rng),
-        waveform: Waveform::White,
+        waveform: Waveform::pick(Waveform::White | Waveform::Pink | Waveform::Brown, &mut rng),
         interpolate_noise: rng.bool(0.5),
         ..Default::default()
     };
