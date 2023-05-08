@@ -79,7 +79,7 @@ impl Tone {
             Waveform::Tangent => wrap(osc::tangent()),
             Waveform::Whistle => wrap(osc::whistle()),
             Waveform::Breaker => wrap(osc::breaker()),
-            Waveform::White => wrap(white()),
+            Waveform::White => wrap(osc::white(true)),
             Waveform::Pink => wrap(pink()),
             Waveform::Brown => wrap(brown()),
         }
@@ -132,6 +132,59 @@ pub fn aspd(amplitude: Amplitude, t: f32) -> f32 {
     }
 }
 
+#[derive(Clone)]
+pub struct Filters {
+    pub flanger_offset: f32,
+    pub flanger_offset_sweep: f32,
+    pub bit_crush: f32,
+    pub bit_crush_sweep: f32,
+    pub low_pass_cutoff: f32,
+    pub low_pass_sweep: f32,
+    pub high_pass_cutoff: f32,
+    pub high_pass_sweep: f32,
+}
+
+impl Default for Filters {
+    fn default() -> Self {
+        Self {
+            flanger_offset: 0.0,
+            flanger_offset_sweep: 0.0,
+            bit_crush: 0.0,
+            bit_crush_sweep: 0.0,
+            low_pass_cutoff: 22_050.0,
+            low_pass_sweep: 0.0,
+            high_pass_cutoff: 0.0,
+            high_pass_sweep: 0.0,
+        }
+    }
+}
+
+impl Filters {
+    pub fn to_net(self, len1: f32) -> Net32 {
+        let mut f = wrap(pass());
+
+        // Make feedback a parameter?
+        if self.flanger_offset > 0.0 {
+            f = f
+                >> flanger(0.0, 0.0, 0.1, move |t| {
+                    self.flanger_offset + self.flanger_offset_sweep * t * len1
+                });
+        }
+
+        if self.low_pass_cutoff < 22_050.0 {
+            f = (f | lfo(move |t| self.low_pass_cutoff + self.low_pass_sweep * t * len1))
+                >> lowpole();
+        }
+
+        if self.high_pass_cutoff > 0.0 {
+            f = (f | lfo(move |t| self.high_pass_cutoff + self.high_pass_sweep * t * len1))
+                >> highpole();
+        }
+
+        f
+    }
+}
+
 pub fn cosine() -> An<Sine<f32>> {
     An(Sine::with_phase(DEFAULT_SR, Some(0.25f32)))
 }
@@ -181,45 +234,85 @@ pub fn jump(seed: u32) -> (Net32, f32) {
         ..Default::default()
     };
 
-    let mut jump = pitch >> tone.to_net(len1) * amplitude.to_net();
+    let mut f = Filters::default();
 
-    // Flanger. Make feedback a parameter?
-    match rng.bool(0.3) {
-        true => {
-            let flanger_delay = rng.f32_in(0.0, 10.0);
-            let flanger_sweep = rng.f32_in(-10.0, 10.0);
-
-            jump = jump
-                >> flanger(0.0, 0.0, 0.1, move |t| {
-                    flanger_delay + flanger_sweep * t * len1
-                });
-        }
-        _ => (),
-    };
+    // Flanger.
+    if rng.bool(0.3) {
+        f.flanger_offset = rng.f32_in(0.0, 10.0);
+        f.flanger_offset_sweep = rng.f32_in(-10.0, 10.0);
+    }
 
     // Low pass filter.
-    match rng.bool(0.5) {
-        true => {
-            let lowpass_cutoff = 440.0;
-            let lowpass_sweep = 0.0;
-            let cutoff = wrap(lfo(move |t| lowpass_cutoff + lowpass_sweep * t * len1));
-            jump = (jump | cutoff) >> wrap(lowpole())
-        }
-        _ => (),
+    if rng.bool(0.5) {
+        f.low_pass_cutoff = rng.f32_in(0.0, 22050.0);
+        f.low_pass_sweep = rng.f32_in(-22050.0, 22050.0);
     }
 
     // High pass filter.
-    match rng.bool(0.5) {
-        true => {
-            let highpass_cutoff = 440.0;
-            let highpass_sweep = 0.0;
-            let cutoff = wrap(lfo(move |t| highpass_cutoff + highpass_sweep * t * len1));
-            jump = (jump | cutoff) >> wrap(highpole())
-        }
-        _ => (),
+    if rng.bool(0.5) {
+        f.high_pass_cutoff = rng.f32_in(0.0, 22050.0);
+        f.high_pass_sweep = rng.f32_in(-22050.0, 22050.0);
     }
 
-    (jump, len)
+    (
+        pitch >> tone.to_net(len1) * amplitude.to_net() >> f.to_net(len1),
+        len,
+    )
+}
+
+pub fn explosion(seed: u32) -> (Net32, f32) {
+    let mut rng = Rnd::from_u32(seed);
+
+    let tone = Tone {
+        //waveform: Waveform::pick(Waveform::White | Waveform::Pink | Waveform::Brown, &mut rng),
+        waveform: Waveform::White,
+        // interpolate_noise: ??
+        ..Default::default()
+    };
+
+    let mut amplitude = Amplitude {
+        sustain: rng.f32_in(0.05, 0.1),
+        punch: match rng.bool(0.5) {
+            true => rng.f32(),
+            false => 0.0,
+        },
+        decay: rng.f32_in(0.3, 0.5),
+        ..Default::default()
+    };
+
+    if rng.bool(0.5) {
+        amplitude.tremolo_depth = rng.f32_in(0.0, 50.0);
+        amplitude.tremolo_frequency = rng.f32_in(0.0, 100.0);
+    }
+
+    let pitch = Pitch {
+        frequency: match tone.waveform {
+            Waveform::Brown => rng.f32_in(10_000.0, 20_000.0),
+            _ => rng.f32_in(1_000.0, 10_000.0),
+        },
+        frequency_sweep: rng.f32_in(-1000.0, -5000.0),
+        frequency_delta_sweep: rng.f32_in(-1000.0, -5000.0),
+        ..Default::default()
+    };
+
+    let len = amplitude.len();
+    let len1 = 1.0 / len;
+
+    let mut explosion = pitch.to_net(len1) >> (tone.to_net(len1) * amplitude.to_net());
+
+    if rng.bool(0.5) {
+        let f = Filters {
+            flanger_offset: rng.f32_in(0.0, 10.0),
+            flanger_offset_sweep: rng.f32_in(-10.0, 10.0),
+            ..Default::default()
+        };
+
+        // TOOD: compression
+
+        explosion = explosion >> f.to_net(len1);
+    }
+
+    (wrap(explosion), len)
 }
 
 #[cfg(test)]
@@ -233,6 +326,10 @@ mod tests {
 
         //let mut jump = sine_hz(110.0) >> map(|i: &Frame<f32, U1>| dbg!(i[0]));
         let (mut jump, len) = jump(0);
+
+        //let len = 0.1;
+        //let mut jump = dc(220.0 / DEFAULT_SR as f32) >> resample(white());
+        //let mut jump = dc(44.1) >> osc::white(false); // >> resonator_hz(0.0, 220.0);
 
         println!("{}", jump.display());
 

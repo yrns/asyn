@@ -1,4 +1,5 @@
 use fundsp::hacker32::*;
+use funutd::Rnd;
 use numeric_array::*;
 
 pub fn square() -> An<Square<f32>> {
@@ -278,4 +279,82 @@ where
     amplitudes
         .enumerate()
         .fold(scaled(1.0), |acc, (i, a)| acc & (xf(i + 1) >> scaled(a)))
+}
+
+pub fn white(lerp: bool) -> An<impl AudioNode<Sample = f32, Inputs = U1, Outputs = U1>> {
+    An(Noise::<f32>::new(DEFAULT_SR, lerp))
+}
+
+/// White noise component.
+/// - Input 0: frequency.
+/// - Output 0: noise.
+#[derive(Default, Clone)]
+pub struct Noise<T> {
+    values: (T, T),
+    phase: T,
+    sample_duration: T,
+    lerp: bool, // f?
+    rnd: Rnd,
+    hash: u64,
+}
+
+impl<T: Float> Noise<T> {
+    pub fn new(sample_rate: f64, lerp: bool) -> Self {
+        let mut noise = Self {
+            lerp,
+            ..Default::default()
+        };
+        noise.reset(Some(sample_rate));
+        noise
+    }
+}
+
+impl<T: Float> AudioNode for Noise<T> {
+    const ID: u64 = 101;
+    type Sample = T;
+    type Inputs = typenum::U1;
+    type Outputs = typenum::U1;
+    type Setting = ();
+
+    fn reset(&mut self, sample_rate: Option<f64>) {
+        self.values = (T::zero(), T::from_f64(self.rnd.f64() * 2.0 - 1.0));
+        self.rnd = Rnd::from_u64(self.hash);
+        self.phase = T::zero();
+
+        if let Some(sr) = sample_rate {
+            self.sample_duration = T::from_f64(1.0 / sr);
+        }
+    }
+
+    #[inline]
+    fn tick(
+        &mut self,
+        input: &Frame<Self::Sample, Self::Inputs>,
+    ) -> Frame<Self::Sample, Self::Outputs> {
+        self.phase += input[0] * self.sample_duration * T::from_f64(2.0); // two samples per phase
+
+        if self.phase > T::one() {
+            self.values = (self.values.1, T::from_f64(self.rnd.f64() * 2.0 - 1.0));
+            self.phase -= self.phase.floor();
+        }
+
+        let value = if self.lerp {
+            lerp(self.values.0, self.values.1, self.phase)
+        } else {
+            self.values.1
+        };
+        [value].into()
+    }
+
+    #[inline]
+    fn set_hash(&mut self, hash: u64) {
+        self.hash = hash;
+        self.reset(None);
+    }
+
+    fn route(&mut self, _input: &SignalFrame, _frequency: f64) -> SignalFrame {
+        let mut output = new_signal_frame(self.outputs());
+        output[0] = Signal::Latency(0.0);
+        output
+    }
 }
