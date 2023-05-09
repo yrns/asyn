@@ -348,6 +348,53 @@ pub fn explosion(seed: u64) -> (Net32, f32) {
     (wrap(explosion), len)
 }
 
+pub fn powerup(seed: u64) -> (Net32, f32) {
+    use Waveform::*;
+
+    let mut rng = Rnd::from_u64(seed);
+
+    let tone = Tone::pick(
+        Sine | Triangle | Saw | Square | Tangent | Whistle | Breaker,
+        &mut rng,
+    );
+
+    let amplitude = Amplitude {
+        sustain: rng.f32_in(0.05, 0.2),
+        punch: rng
+            .bool(0.5)
+            .then(|| rng.f32_in(0.0, 100.0))
+            .unwrap_or_default(),
+        decay: rng.f32_in(0.1, 0.4),
+        ..Default::default()
+    };
+
+    let mut pitch = Pitch {
+        frequency: rng.f32_in(500.0, 2_000.0),
+        frequency_sweep: rng.f32_in(0.0, 2_000.0),
+        frequency_delta_sweep: rng.f32_in(0.0, 2_000.0),
+        // TODO:
+        repeat_frequency: rng
+            .bool(0.5)
+            .then(|| rng.f32_in(0.0, 20.0))
+            .unwrap_or_default(),
+        ..Default::default()
+    };
+
+    // Also TODO:
+    if rng.bool(0.5) {
+        pitch.vibrato_depth = rng.f32_in(0.0, 1000.0);
+        pitch.vibrato_frequency = rng.f32_in(0.0, 1000.0);
+    }
+
+    let len = amplitude.len();
+    let len1 = 1.0 / len;
+
+    let mut powerup = pitch.to_net(len1) >> (tone.to_net(len1) * amplitude.to_net());
+    powerup.ping(false, AttoHash::new(seed));
+
+    (powerup, len)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,7 +405,7 @@ mod tests {
         //let mut jump = (constant(22.0) | constant(0.5)) >> harmonic(osc::square(), 3, 0.5);
 
         //let mut jump = sine_hz(110.0) >> map(|i: &Frame<f32, U1>| dbg!(i[0]));
-        let (mut jump, len) = explosion(0);
+        let (mut jump, len) = powerup(0);
 
         //let len = 0.1;
         //let mut jump = dc(220.0 / DEFAULT_SR as f32) >> resample(white());
