@@ -145,6 +145,7 @@ pub struct Filters {
     pub low_pass_sweep: f32,
     pub high_pass_cutoff: f32,
     pub high_pass_sweep: f32,
+    pub compression: f32,
 }
 
 impl Default for Filters {
@@ -158,6 +159,7 @@ impl Default for Filters {
             low_pass_sweep: 0.0,
             high_pass_cutoff: 0.0,
             high_pass_sweep: 0.0,
+            compression: 1.0,
         }
     }
 }
@@ -184,6 +186,19 @@ impl Filters {
                 >> highpole();
         }
 
+        let c = dbg!(self.compression);
+        if c != 1.0 {
+            f = f
+                >> map(move |f: &Frame<f32, U1>| {
+                    let sample = f[0];
+                    if sample >= 0.0 {
+                        sample.pow(c)
+                    } else {
+                        -((-sample).pow(c))
+                    }
+                });
+        }
+
         f
     }
 }
@@ -204,8 +219,8 @@ pub fn wrap(unit: impl AudioUnit32 + 'static) -> Net32 {
     Net32::wrap(unit)
 }
 
-pub fn jump(seed: u32) -> (Net32, f32) {
-    let mut rng = Rnd::from_u32(seed);
+pub fn jump(seed: u64) -> (Net32, f32) {
+    let mut rng = Rnd::from_u64(seed);
 
     let amplitude = Amplitude {
         sustain: rng.f32_in(0.02, 0.1),
@@ -257,14 +272,14 @@ pub fn jump(seed: u32) -> (Net32, f32) {
         f.high_pass_sweep = rng.f32_in(-22050.0, 22050.0);
     }
 
-    (
-        pitch >> tone.to_net(len1) * amplitude.to_net() >> f.to_net(len1),
-        len,
-    )
+    let mut jump = pitch >> tone.to_net(len1) * amplitude.to_net() >> f.to_net(len1);
+    jump.ping(false, AttoHash::new(seed));
+
+    (jump, len)
 }
 
-pub fn explosion(seed: u32) -> (Net32, f32) {
-    let mut rng = Rnd::from_u32(seed);
+pub fn explosion(seed: u64) -> (Net32, f32) {
+    let mut rng = Rnd::from_u64(seed);
 
     let tone = Tone {
         waveform: Waveform::pick(Waveform::White | Waveform::Pink | Waveform::Brown, &mut rng),
@@ -302,17 +317,21 @@ pub fn explosion(seed: u32) -> (Net32, f32) {
 
     let mut explosion = pitch.to_net(len1) >> (tone.to_net(len1) * amplitude.to_net());
 
+    let mut f = Filters::default();
+
     if rng.bool(0.5) {
-        let f = Filters {
-            flanger_offset: rng.f32_in(0.0, 10.0),
-            flanger_offset_sweep: rng.f32_in(-10.0, 10.0),
-            ..Default::default()
-        };
-
-        // TOOD: compression
-
-        explosion = explosion >> f.to_net(len1);
+        f.flanger_offset = rng.f32_in(0.0, 10.0);
+        f.flanger_offset_sweep = rng.f32_in(-10.0, 10.0);
     }
+
+    if rng.bool(0.5) {
+        f.compression = rng.f32_in(0.5, 2.0);
+    }
+
+    explosion = explosion >> f.to_net(len1);
+
+    // Make this sound reproducible from the seed.
+    explosion.ping(false, AttoHash::new(seed));
 
     (wrap(explosion), len)
 }
