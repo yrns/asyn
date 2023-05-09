@@ -61,6 +61,23 @@ pub struct Tone {
 }
 
 impl Tone {
+    pub fn pick(set: FlagSet<Waveform>, rng: &mut Rnd) -> Self {
+        Self {
+            waveform: Waveform::pick(set, rng),
+            square_duty: if set.contains(Waveform::Square) {
+                rng.f32_in(0.0, 100.0)
+            } else {
+                0.0
+            },
+            square_duty_sweep: if set.contains(Waveform::Square) {
+                rng.f32_in(-100.0, 100.0)
+            } else {
+                0.0
+            },
+            ..Default::default()
+        }
+    }
+
     pub fn to_net(self, len1: f32) -> Net32 {
         match self.waveform {
             Waveform::Sine => wrap(sine()),
@@ -242,15 +259,10 @@ pub fn jump(seed: u64) -> (Net32, f32) {
     }
     .to_net(len1);
 
-    let tone = Tone {
-        waveform: Waveform::pick(
-            Waveform::Sine | Waveform::Square | Waveform::Whistle | Waveform::Breaker,
-            &mut rng,
-        ),
-        square_duty: rng.f32_in(0.0, 100.0),
-        square_duty_sweep: rng.f32_in(-100.0, 100.0),
-        ..Default::default()
-    };
+    let tone = Tone::pick(
+        Waveform::Sine | Waveform::Square | Waveform::Whistle | Waveform::Breaker,
+        &mut rng,
+    );
 
     let mut f = Filters::default();
 
