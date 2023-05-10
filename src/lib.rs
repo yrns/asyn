@@ -97,12 +97,12 @@ impl Tone {
         Self {
             waveform: Waveform::pick(set, rng),
             square_duty: if set.contains(Waveform::Square) {
-                rng.f32_in(0.0, 100.0)
+                rng.f32()
             } else {
                 0.0
             },
             square_duty_sweep: if set.contains(Waveform::Square) {
-                rng.f32_in(-100.0, 100.0)
+                rng.f32_in(-1.0, 1.0)
             } else {
                 0.0
             },
