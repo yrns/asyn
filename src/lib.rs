@@ -12,15 +12,21 @@ pub struct Pitch {
     pub frequency_delta_sweep: f32,
     pub vibrato_depth: f32,
     pub vibrato_frequency: f32,
+    // This does nothing without sweep.
     pub repeat_frequency: f32,
-    pub frequency_jump1: (f32, f32),
+    pub frequency_jump1: (f32, f32), // onset (0.0-1.0), amount
     pub frequency_jump2: (f32, f32),
 }
 
 impl Pitch {
     pub fn to_net(self, len1: f32) -> Net32 {
         wrap(lfo(move |t| {
-            self.frequency + self.frequency_sweep * t * len1
+            let t_repeat = fract(t * len1 * self.repeat_frequency.max(len1));
+            // Delta sweep is quadratic.
+            let sweep =
+                t_repeat * self.frequency_sweep + t_repeat * t_repeat * self.frequency_delta_sweep;
+
+            (self.frequency + sweep).max(0.0)
         }))
     }
 }
@@ -102,6 +108,15 @@ impl Tone {
             Waveform::Brown => {
                 wrap(osc::white(self.interpolate_noise) >> lowpole_hz(10.0) * dc(13.7))
             }
+        }
+    }
+}
+
+impl From<Waveform> for Tone {
+    fn from(waveform: Waveform) -> Self {
+        Self {
+            waveform,
+            ..Default::default()
         }
     }
 }
@@ -372,7 +387,6 @@ pub fn powerup(seed: u64) -> (Net32, f32) {
         frequency: rng.f32_in(500.0, 2_000.0),
         frequency_sweep: rng.f32_in(0.0, 2_000.0),
         frequency_delta_sweep: rng.f32_in(0.0, 2_000.0),
-        // TODO:
         repeat_frequency: rng
             .bool(0.5)
             .then(|| rng.f32_in(0.0, 20.0))
@@ -405,11 +419,19 @@ mod tests {
         //let mut jump = (constant(22.0) | constant(0.5)) >> harmonic(osc::square(), 3, 0.5);
 
         //let mut jump = sine_hz(110.0) >> map(|i: &Frame<f32, U1>| dbg!(i[0]));
-        let (mut jump, len) = powerup(0);
+        //let (mut jump, len) = powerup(0);
 
-        //let len = 0.1;
+        let len = 1.0;
         //let mut jump = dc(220.0 / DEFAULT_SR as f32) >> resample(white());
         //let mut jump = dc(44.1) >> osc::white(false); // >> resonator_hz(0.0, 220.0);
+        let mut jump = Pitch {
+            frequency: 220.0,
+            frequency_delta_sweep: -440.0,
+            repeat_frequency: 2.0,
+            ..Default::default()
+        }
+        .to_net(1.0)
+            >> Tone::from(Waveform::Triangle).to_net(1.0);
 
         println!("{}", jump.display());
 
