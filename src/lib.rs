@@ -14,21 +14,47 @@ pub struct Pitch {
     pub vibrato_frequency: f32,
     // This does nothing without sweep.
     pub repeat_frequency: f32,
-    pub frequency_jump1: (f32, f32), // onset (0.0-1.0), amount
+    pub frequency_jump1: (f32, f32), // onset %, amount %
     pub frequency_jump2: (f32, f32),
 }
 
 impl Pitch {
     pub fn to_net(self, len1: f32) -> Net32 {
         wrap(lfo(move |t| {
+            // t in repetition.
             let t_repeat = fract(t * len1 * self.repeat_frequency.max(len1));
-            // Delta sweep is quadratic.
-            let sweep =
-                t_repeat * self.frequency_sweep + t_repeat * t_repeat * self.frequency_delta_sweep;
 
-            (self.frequency + sweep).max(0.0)
+            let mut f = self.frequency
+                + t_repeat * self.frequency_sweep
+                // Delta sweep is quadratic.
+                + t_repeat * t_repeat * self.frequency_delta_sweep;
+
+            // Jump 1.
+            let jump = self.frequency_jump1;
+            if t_repeat > jump.0 {
+                f *= 1.0 + jump.1;
+            }
+
+            // Jump 2.
+            let jump = self.frequency_jump2;
+            if t_repeat > jump.0 {
+                f *= 1.0 + jump.1;
+            }
+
+            // Vibrato.
+            if self.vibrato_depth > 0.0 && self.vibrato_frequency > 0.0 {
+                // Why 1 - vibrato? So it's always positive?
+                f += 1.0 - lerp11(0.0, self.vibrato_depth, sin_hz(self.vibrato_frequency, t));
+            }
+
+            f.max(0.0)
         }))
     }
+}
+
+/// Vibrato.
+pub fn vibrato(depth: f32, frequency: f32) -> An<impl AudioNode> {
+    lfo(move |t| lerp11(0.0, depth, sin_hz(frequency, t)))
 }
 
 flags! {
@@ -394,7 +420,6 @@ pub fn powerup(seed: u64) -> (Net32, f32) {
         ..Default::default()
     };
 
-    // Also TODO:
     if rng.bool(0.5) {
         pitch.vibrato_depth = rng.f32_in(0.0, 1000.0);
         pitch.vibrato_frequency = rng.f32_in(0.0, 1000.0);
@@ -419,19 +444,21 @@ mod tests {
         //let mut jump = (constant(22.0) | constant(0.5)) >> harmonic(osc::square(), 3, 0.5);
 
         //let mut jump = sine_hz(110.0) >> map(|i: &Frame<f32, U1>| dbg!(i[0]));
-        //let (mut jump, len) = powerup(0);
+        let (mut jump, len) = powerup(0);
 
-        let len = 1.0;
+        //let len = 1.0;
         //let mut jump = dc(220.0 / DEFAULT_SR as f32) >> resample(white());
         //let mut jump = dc(44.1) >> osc::white(false); // >> resonator_hz(0.0, 220.0);
-        let mut jump = Pitch {
-            frequency: 220.0,
-            frequency_delta_sweep: -440.0,
-            repeat_frequency: 2.0,
-            ..Default::default()
-        }
-        .to_net(1.0)
-            >> Tone::from(Waveform::Triangle).to_net(1.0);
+        // let mut jump = Pitch {
+        //     frequency: 220.0,
+        //     frequency_delta_sweep: -440.0,
+        //     repeat_frequency: 2.0,
+        //     vibrato_depth: 220.0,
+        //     vibrato_frequency: 10.0,
+        //     ..Default::default()
+        // }
+        // .to_net(1.0)
+        //     >> Tone::from(Waveform::Triangle).to_net(1.0);
 
         println!("{}", jump.display());
 
