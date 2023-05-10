@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use flagset::{flags, FlagSet};
 use fundsp::hacker32::*;
 use funutd::Rnd;
@@ -16,6 +18,35 @@ pub struct Pitch {
     pub repeat_frequency: f32,
     pub frequency_jump1: (f32, f32), // onset %, amount %
     pub frequency_jump2: (f32, f32),
+}
+
+impl Display for Pitch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.0} hz", self.frequency)?;
+        if self.frequency_sweep > 0.0 {
+            write!(f, " sweep: {:.0}", self.frequency_sweep)?;
+        }
+        if self.frequency_delta_sweep > 0.0 {
+            write!(f, " delta sweep: {:.0}", self.frequency_sweep)?;
+        }
+        if self.vibrato_depth > 0.0 && self.vibrato_frequency > 0.0 {
+            write!(
+                f,
+                " vibrato: ({:.0}, {:.0})",
+                self.vibrato_depth, self.vibrato_frequency
+            )?;
+        }
+        if self.repeat_frequency > 0.0 {
+            write!(f, " repeat: {:.0}", self.repeat_frequency)?;
+        }
+        if self.frequency_jump1.0 > 0.0 {
+            write!(f, " jump1: {:?}", self.frequency_jump1)?;
+        }
+        if self.frequency_jump2.0 > 0.0 {
+            write!(f, " jump1: {:?}", self.frequency_jump2)?;
+        }
+        Ok(())
+    }
 }
 
 impl Pitch {
@@ -92,6 +123,30 @@ pub struct Tone {
     pub harmonics_falloff: f32,
 }
 
+impl Display for Tone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "tone: {:?}", self.waveform)?;
+        if self.interpolate_noise {
+            write!(f, " interp")?;
+        }
+        if self.square_duty > 0.0 {
+            write!(
+                f,
+                " duty: {:.0} sweep: {:.0}",
+                self.square_duty, self.square_duty_sweep
+            )?;
+        }
+        if self.harmonics > 0 {
+            write!(
+                f,
+                " harmonics: {} falloff: {:.1}",
+                self.harmonics, self.harmonics_falloff
+            )?;
+        }
+        Ok(())
+    }
+}
+
 impl Tone {
     pub fn pick(set: FlagSet<Waveform>, rng: &mut Rnd) -> Self {
         Self {
@@ -157,6 +212,32 @@ pub struct Amplitude {
     pub tremolo_frequency: f32,
 }
 
+impl Display for Amplitude {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "amplitude:")?;
+        if self.attack > 0.0 {
+            write!(f, " {:.1} attack", self.attack)?;
+        }
+        if self.sustain > 0.0 {
+            write!(f, " {:.1} sustain", self.sustain)?;
+        }
+        if self.punch > 0.0 {
+            write!(f, " {:.1} punch", self.punch)?;
+        }
+        if self.decay > 0.0 {
+            write!(f, " {:.1} decay", self.decay)?;
+        }
+        if self.tremolo_depth > 0.0 {
+            write!(
+                f,
+                " tremolo: {:.0}/{:.0}",
+                self.tremolo_depth, self.tremolo_frequency
+            )?;
+        }
+        Ok(())
+    }
+}
+
 impl Amplitude {
     pub fn len(&self) -> f32 {
         self.attack + self.sustain + self.decay
@@ -219,6 +300,43 @@ impl Default for Filters {
             high_pass_sweep: 0.0,
             compression: 1.0,
         }
+    }
+}
+
+impl Display for Filters {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.flanger_offset > 0.0 {
+            write!(
+                f,
+                " flanger: {:.1}/{:.1}",
+                self.flanger_offset, self.flanger_offset_sweep
+            )?;
+        }
+        if self.bit_crush > 0.0 {
+            write!(
+                f,
+                " bit_crush: {:.1}/{:.1}",
+                self.bit_crush, self.bit_crush_sweep
+            )?;
+        }
+        if self.low_pass_cutoff < 22_050.0 {
+            write!(
+                f,
+                " low_pass: {:.0}/{:.0}",
+                self.low_pass_cutoff, self.low_pass_sweep
+            )?;
+        }
+        if self.high_pass_cutoff > 0.0 {
+            write!(
+                f,
+                " high_pass: {:.0}/{:.0}",
+                self.high_pass_cutoff, self.high_pass_sweep
+            )?;
+        }
+        if self.compression != 1.0 {
+            write!(f, " compression: {:.1}", self.compression)?;
+        }
+        Ok(())
     }
 }
 
@@ -424,6 +542,11 @@ pub fn powerup(seed: u64) -> (Net32, f32) {
         pitch.vibrato_depth = rng.f32_in(0.0, 1000.0);
         pitch.vibrato_frequency = rng.f32_in(0.0, 1000.0);
     }
+
+    println!(
+        "powerup: seed: {} [{}] [{}] [{}]",
+        seed, &pitch, &tone, &amplitude
+    );
 
     let len = amplitude.len();
     let len1 = 1.0 / len;
