@@ -96,7 +96,7 @@ pub struct Pitch {
 
 impl fmt::Display for Pitch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.0} hz", self.frequency)?;
+        write!(f, "{:.0}hz", self.frequency)?;
         if self.frequency_sweep > 0.0 {
             write!(f, " sweep: {:.0}", self.frequency_sweep)?;
         }
@@ -113,11 +113,13 @@ impl fmt::Display for Pitch {
         if self.repeat_frequency > 0.0 {
             write!(f, " repeat: {:.0}", self.repeat_frequency)?;
         }
-        if self.frequency_jump1.0 > 0.0 {
-            write!(f, " jump1: {:?}", self.frequency_jump1)?;
+        let (onset, amount) = self.frequency_jump1;
+        if onset > 0.0 {
+            write!(f, " jump1: ({onset:.2}, {amount:.2})")?;
         }
-        if self.frequency_jump2.0 > 0.0 {
-            write!(f, " jump1: {:?}", self.frequency_jump2)?;
+        let (onset, amount) = self.frequency_jump2;
+        if onset > 0.0 {
+            write!(f, " jump2: ({onset:.2}, {amount:.2})")?;
         }
         Ok(())
     }
@@ -198,10 +200,10 @@ impl fmt::Display for Tone {
         if self.interpolate_noise {
             write!(f, " interp")?;
         }
-        if self.square_duty > 0.0 {
+        if matches!(self.waveform, Waveform::Square) && self.square_duty > 0.0 {
             write!(
                 f,
-                " duty: {:.0} sweep: {:.0}",
+                " duty: {:.2} sweep: {:.2}",
                 self.square_duty, self.square_duty_sweep
             )?;
         }
