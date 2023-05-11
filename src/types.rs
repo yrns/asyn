@@ -27,6 +27,59 @@ pub fn wrap(unit: impl AudioUnit32 + 'static) -> Net32 {
     Net32::wrap(unit)
 }
 
+#[derive(Default)]
+pub struct Asyn {
+    pub seed: u64,
+    pub pitch: Pitch,
+    pub tone: Tone,
+    pub amplitude: Amplitude,
+    pub filters: Option<Filters>,
+}
+
+impl Asyn {
+    pub fn len(&self) -> f32 {
+        self.amplitude.len()
+    }
+
+    pub fn to_net(self) -> Net32 {
+        let Asyn {
+            seed,
+            pitch,
+            tone,
+            amplitude,
+            filters,
+        } = self;
+
+        let len = amplitude.len();
+        let len1 = 1.0 / len;
+
+        let mut net = pitch.to_net(len1) >> (tone.to_net(len1) * amplitude.to_net());
+        if let Some(f) = filters {
+            net = net >> f.to_net(len1);
+        }
+
+        // This makes it so there's no random variance with the same seed.
+        net.ping(false, AttoHash::new(seed));
+
+        net
+    }
+
+    pub fn to_wav(self) -> Wave32 {
+        Wave32::render(44100.0, self.len() as f64, &mut self.to_net())
+    }
+}
+
+impl fmt::Display for Asyn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO filters
+        write!(
+            f,
+            "seed: {} [{}] [{}] [{}]",
+            self.seed, self.pitch, self.tone, self.amplitude
+        )
+    }
+}
+
 #[derive(Copy, Clone, Default)]
 pub struct Pitch {
     pub frequency: f32,
@@ -41,7 +94,7 @@ pub struct Pitch {
 }
 
 impl fmt::Display for Pitch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:.0} hz", self.frequency)?;
         if self.frequency_sweep > 0.0 {
             write!(f, " sweep: {:.0}", self.frequency_sweep)?;
@@ -139,7 +192,7 @@ pub struct Tone {
 }
 
 impl fmt::Display for Tone {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "tone: {:?}", self.waveform)?;
         if self.interpolate_noise {
             write!(f, " interp")?;
@@ -228,7 +281,7 @@ pub struct Amplitude {
 }
 
 impl fmt::Display for Amplitude {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "amplitude:")?;
         if self.attack > 0.0 {
             write!(f, " {:.1} attack", self.attack)?;
@@ -319,7 +372,7 @@ impl Default for Filters {
 }
 
 impl fmt::Display for Filters {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.flanger_offset > 0.0 {
             write!(
                 f,

@@ -19,8 +19,6 @@ pub use types::*;
 
 #[cfg(test)]
 mod tests {
-    use fundsp::{prelude::AudioUnit32, wave::Wave32};
-
     use crate::presets::*;
 
     #[test]
@@ -29,7 +27,6 @@ mod tests {
         //let mut jump = (constant(22.0) | constant(0.5)) >> harmonic(osc::square(), 3, 0.5);
 
         //let mut jump = sine_hz(110.0) >> map(|i: &Frame<f32, U1>| dbg!(i[0]));
-        let (mut jump, len) = pickup(0);
 
         //let len = 1.0;
         //let mut jump = dc(220.0 / DEFAULT_SR as f32) >> resample(white());
@@ -45,15 +42,7 @@ mod tests {
         // .to_net(1.0)
         //     >> Tone::from(Waveform::Triangle).to_net(1.0);
 
-        println!("{}", jump.display());
-
-        let wav = Wave32::render(44100.0, len as f64, &mut jump);
-        dbg!(wav.amplitude());
-        //wav.normalize();
-        //dbg!(wav.amplitude());
-
+        pickup(0).to_wav().save_wav16("jump.wav").unwrap();
         //wav.write_wav16(&mut std::io::stdout().lock()).unwrap();
-        let path = std::path::Path::new("jump.wav");
-        wav.save_wav16(path).unwrap();
     }
 }
