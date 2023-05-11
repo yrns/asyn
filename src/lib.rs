@@ -42,7 +42,7 @@ mod tests {
         // .to_net(1.0)
         //     >> Tone::from(Waveform::Triangle).to_net(1.0);
 
-        pickup(0).to_wav().save_wav16("jump.wav").unwrap();
+        powerup(0).to_wav().save_wav16("test.wav").unwrap();
         //wav.write_wav16(&mut std::io::stdout().lock()).unwrap();
     }
 }

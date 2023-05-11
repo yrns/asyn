@@ -5,7 +5,7 @@ pub fn pickup(seed: u64) -> Asyn {
 
     let mut rng = funutd::Rnd::from_u64(seed);
 
-    let asyn = Asyn {
+    Asyn {
         seed,
         tone: Tone::pick(Sine | Square | Whistle | Breaker, &mut rng),
         amplitude: Amplitude {
@@ -35,9 +35,5 @@ pub fn pickup(seed: u64) -> Asyn {
             ..Default::default()
         }),
         ..Default::default()
-    };
-
-    println!("pickup: {}", &asyn);
-
-    asyn
+    }
 }

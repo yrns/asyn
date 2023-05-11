@@ -65,7 +65,8 @@ impl Asyn {
     }
 
     pub fn to_wav(self) -> Wave32 {
-        Wave32::render(44100.0, self.len() as f64, &mut self.to_net())
+        println!("to_wav: {}", &self);
+        Wave32::render(DEFAULT_SR, self.len() as f64, &mut self.to_net())
     }
 }
 
