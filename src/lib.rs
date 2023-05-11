@@ -4,10 +4,12 @@ mod types;
 pub mod presets {
     pub mod explosion;
     pub mod jump;
+    pub mod pickup;
     pub mod powerup;
 
     pub use explosion::*;
     pub use jump::*;
+    pub use pickup::*;
     pub use powerup::*;
 }
 
@@ -27,7 +29,7 @@ mod tests {
         //let mut jump = (constant(22.0) | constant(0.5)) >> harmonic(osc::square(), 3, 0.5);
 
         //let mut jump = sine_hz(110.0) >> map(|i: &Frame<f32, U1>| dbg!(i[0]));
-        let (mut jump, len) = powerup(0);
+        let (mut jump, len) = pickup(0);
 
         //let len = 1.0;
         //let mut jump = dc(220.0 / DEFAULT_SR as f32) >> resample(white());
