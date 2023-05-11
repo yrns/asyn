@@ -1,10 +1,7 @@
-use fundsp::prelude::{AttoHash, AudioUnit32, Net32};
-use funutd::Rnd;
+use crate::types::{Amplitude, Asyn, Filters, Pitch, Tone, Waveform};
 
-use crate::types::{Amplitude, Filters, Pitch, Tone, Waveform};
-
-pub fn explosion(seed: u64) -> (Net32, f32) {
-    let mut rng = Rnd::from_u64(seed);
+pub fn explosion(seed: u64) -> Asyn {
+    let mut rng = funutd::Rnd::from_u64(seed);
 
     let tone = Tone {
         waveform: Waveform::pick(Waveform::White | Waveform::Pink | Waveform::Brown, &mut rng),
@@ -37,11 +34,6 @@ pub fn explosion(seed: u64) -> (Net32, f32) {
         ..Default::default()
     };
 
-    let len = amplitude.len();
-    let len1 = 1.0 / len;
-
-    let mut explosion = pitch.to_net(len1) >> (tone.to_net(len1) * amplitude.to_net());
-
     let mut f = Filters::default();
 
     if rng.bool(0.5) {
@@ -53,10 +45,11 @@ pub fn explosion(seed: u64) -> (Net32, f32) {
         f.compression = rng.f32_in(0.5, 2.0);
     }
 
-    explosion = explosion >> f.to_net(len1);
-
-    // Make this sound reproducible from the seed.
-    explosion.ping(false, AttoHash::new(seed));
-
-    (explosion, len)
+    Asyn {
+        seed,
+        pitch,
+        tone,
+        amplitude,
+        filters: Some(f),
+    }
 }
