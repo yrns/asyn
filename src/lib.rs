@@ -4,11 +4,13 @@ mod types;
 pub mod presets {
     pub mod explosion;
     pub mod jump;
+    pub mod laser;
     pub mod pickup;
     pub mod powerup;
 
     pub use explosion::*;
     pub use jump::*;
+    pub use laser::*;
     pub use pickup::*;
     pub use powerup::*;
 }
@@ -42,7 +44,10 @@ mod tests {
         // .to_net(1.0)
         //     >> Tone::from(Waveform::Triangle).to_net(1.0);
 
-        powerup(0).to_wav().save_wav16("test.wav").unwrap();
+        laser(funutd::Rnd::from_time().u64())
+            .to_wav()
+            .save_wav16("test.wav")
+            .unwrap();
         //wav.write_wav16(&mut std::io::stdout().lock()).unwrap();
     }
 }
