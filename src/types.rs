@@ -72,12 +72,15 @@ impl Asyn {
 
 impl fmt::Display for Asyn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO filters
         write!(
             f,
             "seed: {} [{}] [{}] [{}]",
             self.seed, self.pitch, self.tone, self.amplitude
-        )
+        )?;
+        if let Some(filters) = self.filters.as_ref() {
+            write!(f, "[{}]", filters)?;
+        }
+        Ok(())
     }
 }
 
@@ -101,7 +104,7 @@ impl fmt::Display for Pitch {
             write!(f, " sweep: {:.0}", self.frequency_sweep)?;
         }
         if self.frequency_delta_sweep != 0.0 {
-            write!(f, " delta sweep: {:.0}", self.frequency_sweep)?;
+            write!(f, " delta sweep: {:.0}", self.frequency_delta_sweep)?;
         }
         if self.vibrato_depth > 0.0 && self.vibrato_frequency > 0.0 {
             write!(
@@ -289,16 +292,16 @@ impl fmt::Display for Amplitude {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "amplitude:")?;
         if self.attack > 0.0 {
-            write!(f, " {:.1} attack", self.attack)?;
+            write!(f, " {:.2} attack", self.attack)?;
         }
         if self.sustain > 0.0 {
-            write!(f, " {:.1} sustain", self.sustain)?;
+            write!(f, " {:.2} sustain", self.sustain)?;
         }
         if self.punch > 0.0 {
-            write!(f, " {:.1} punch", self.punch)?;
+            write!(f, " {:.2} punch", self.punch)?;
         }
         if self.decay > 0.0 {
-            write!(f, " {:.1} decay", self.decay)?;
+            write!(f, " {:.2} decay", self.decay)?;
         }
         if self.tremolo_depth > 0.0 {
             write!(
@@ -392,14 +395,14 @@ impl fmt::Display for Filters {
                 self.bit_crush, self.bit_crush_sweep
             )?;
         }
-        if self.low_pass_cutoff < 22_050.0 {
+        if self.low_pass_cutoff < 22_050.0 || self.low_pass_sweep != 0.0 {
             write!(
                 f,
                 " low_pass: {:.0}/{:.0}",
                 self.low_pass_cutoff, self.low_pass_sweep
             )?;
         }
-        if self.high_pass_cutoff > 0.0 {
+        if self.high_pass_cutoff > 0.0 || self.high_pass_sweep != 0.0 {
             write!(
                 f,
                 " high_pass: {:.0}/{:.0}",
@@ -435,7 +438,7 @@ impl Filters {
                 >> highpole();
         }
 
-        let c = dbg!(self.compression);
+        let c = self.compression;
         if c != 1.0 {
             f = f
                 >> map(move |f: &Frame<f32, U1>| {
