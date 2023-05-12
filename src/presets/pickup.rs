@@ -10,10 +10,7 @@ pub fn pickup(seed: u64) -> Asyn {
         tone: Tone::pick(Sine | Square | Whistle | Breaker, &mut rng),
         amplitude: Amplitude {
             sustain: rng.f32_in(0.02, 0.1),
-            punch: rng
-                .bool(0.5)
-                .then(|| rng.f32_in(0.0, 100.0))
-                .unwrap_or_default(),
+            punch: rng.bool(0.5).then(|| rng.f32()).unwrap_or_default(),
             decay: rng.f32_in(0.05, 0.4),
             ..Default::default()
         },

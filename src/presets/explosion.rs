@@ -11,10 +11,7 @@ pub fn explosion(seed: u64) -> Asyn {
 
     let mut amplitude = Amplitude {
         sustain: rng.f32_in(0.05, 0.1),
-        punch: match rng.bool(0.5) {
-            true => rng.f32(),
-            false => 0.0,
-        },
+        punch: rng.bool(0.5).then(|| rng.f32()).unwrap_or_default(),
         decay: rng.f32_in(0.3, 0.5),
         ..Default::default()
     };
