@@ -232,6 +232,8 @@ impl Tone {
             } else {
                 0.0
             },
+            // Interpolation defaults to true for noise.
+            interpolate_noise: set.contains(Waveform::White | Waveform::Pink | Waveform::Brown),
             ..Default::default()
         }
     }
