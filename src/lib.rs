@@ -3,12 +3,14 @@ mod play;
 mod types;
 pub mod presets {
     pub mod explosion;
+    pub mod hit;
     pub mod jump;
     pub mod laser;
     pub mod pickup;
     pub mod powerup;
 
     pub use explosion::*;
+    pub use hit::*;
     pub use jump::*;
     pub use laser::*;
     pub use pickup::*;
