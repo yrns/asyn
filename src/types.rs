@@ -27,7 +27,7 @@ pub fn wrap(unit: impl AudioUnit32 + 'static) -> Net32 {
     Net32::wrap(unit)
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Asyn {
     pub seed: u64,
     pub pitch: Pitch,
@@ -81,7 +81,7 @@ impl fmt::Display for Asyn {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Pitch {
     pub frequency: f32,
     pub frequency_sweep: f32,
@@ -97,10 +97,10 @@ pub struct Pitch {
 impl fmt::Display for Pitch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:.0}hz", self.frequency)?;
-        if self.frequency_sweep > 0.0 {
+        if self.frequency_sweep != 0.0 {
             write!(f, " sweep: {:.0}", self.frequency_sweep)?;
         }
-        if self.frequency_delta_sweep > 0.0 {
+        if self.frequency_delta_sweep != 0.0 {
             write!(f, " delta sweep: {:.0}", self.frequency_sweep)?;
         }
         if self.vibrato_depth > 0.0 && self.vibrato_frequency > 0.0 {
@@ -184,7 +184,7 @@ impl Waveform {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Tone {
     pub waveform: Waveform,
     pub interpolate_noise: bool,
@@ -273,7 +273,7 @@ impl From<Waveform> for Tone {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Amplitude {
     pub attack: f32,
     pub sustain: f32,
@@ -345,7 +345,7 @@ pub fn aspd(amplitude: Amplitude, t: f32) -> f32 {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Filters {
     pub flanger_offset: f32,
     pub flanger_offset_sweep: f32,
