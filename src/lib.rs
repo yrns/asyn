@@ -2,6 +2,7 @@ mod osc;
 mod play;
 mod types;
 pub mod presets {
+    pub mod blip;
     pub mod explosion;
     pub mod hit;
     pub mod jump;
@@ -9,6 +10,7 @@ pub mod presets {
     pub mod pickup;
     pub mod powerup;
 
+    pub use blip::*;
     pub use explosion::*;
     pub use hit::*;
     pub use jump::*;
@@ -46,7 +48,7 @@ mod tests {
         // .to_net(1.0)
         //     >> Tone::from(Waveform::Triangle).to_net(1.0);
 
-        laser(funutd::Rnd::from_time().u64())
+        blip(funutd::Rnd::from_time().u64())
             .to_wav()
             .save_wav16("test.wav")
             .unwrap();
