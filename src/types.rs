@@ -129,10 +129,18 @@ impl fmt::Display for Pitch {
 }
 
 impl Pitch {
+    // The first few t values are 0. Is this a bug with the envelope?
     pub fn to_net(self, len1: f32) -> Net32 {
+        let erf = self.repeat_frequency.max(len1);
+
         wrap(lfo(move |t| {
-            // t in repetition.
-            let t_repeat = fract(t * len1 * self.repeat_frequency.max(len1));
+            // t in repetition. We will get t values outside the total length because of the
+            // envelope jitter, so don't actually repeat if we're not repeating.
+            let t_repeat = if self.repeat_frequency > 0.0 {
+                fract(t * erf)
+            } else {
+                t * len1
+            };
 
             let mut f = self.frequency
                 + t_repeat * self.frequency_sweep
@@ -157,6 +165,7 @@ impl Pitch {
                 f += 1.0 - lerp11(0.0, self.vibrato_depth, sin_hz(self.vibrato_frequency, t));
             }
 
+            //println!("t: {t} t_r: {t_repeat} len: {}", (1.0 / len1));
             f.max(0.0)
         }))
     }
