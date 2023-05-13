@@ -420,22 +420,38 @@ impl Filters {
     pub fn to_net(self, len1: f32) -> Net32 {
         let mut f = wrap(pass());
 
-        // Make feedback a parameter?
-        if self.flanger_offset > 0.0 {
+        let delay1 = self.flanger_offset;
+        let sweep = self.flanger_offset_sweep;
+        let delay2 = (delay1 + sweep).max(0.0);
+
+        // jfxr does not clamp to 0 and sounds very loud without normalization. It also just sounds
+        // different with a zero delay...
+        if delay1 > 0.0 || delay2 > 0.0 {
             f = f
-                >> flanger(0.0, 0.0, 0.1, move |t| {
-                    self.flanger_offset + self.flanger_offset_sweep * t * len1
+                // Make feedback a parameter?
+                >> flanger(0.0, delay1.min(delay2), delay1.max(delay2), move |t| {
+                    (delay1 + sweep * t * len1).max(0.0)
                 });
         }
 
         if self.low_pass_cutoff < 22_050.0 {
-            f = (f | lfo(move |t| self.low_pass_cutoff + self.low_pass_sweep * t * len1))
-                >> lowpole();
+            f = (f | lfo(move |t| {
+                clamp(
+                    0.0,
+                    DEFAULT_SR as f32 / 2.0,
+                    self.low_pass_cutoff + self.low_pass_sweep * t * len1,
+                )
+            })) >> lowpole();
         }
 
         if self.high_pass_cutoff > 0.0 {
-            f = (f | lfo(move |t| self.high_pass_cutoff + self.high_pass_sweep * t * len1))
-                >> highpole();
+            f = (f | lfo(move |t| {
+                clamp(
+                    0.0,
+                    DEFAULT_SR as f32 / 2.0,
+                    self.high_pass_cutoff + self.high_pass_sweep * t * len1,
+                )
+            })) >> highpole();
         }
 
         let c = self.compression;
