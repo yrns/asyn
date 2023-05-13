@@ -117,11 +117,11 @@ impl fmt::Display for Pitch {
             write!(f, " repeat: {:.0}", self.repeat_frequency)?;
         }
         let (onset, amount) = self.frequency_jump1;
-        if onset > 0.0 {
+        if amount > 0.0 {
             write!(f, " jump1: ({onset:.2}, {amount:.2})")?;
         }
         let (onset, amount) = self.frequency_jump2;
-        if onset > 0.0 {
+        if amount > 0.0 {
             write!(f, " jump2: ({onset:.2}, {amount:.2})")?;
         }
         Ok(())
