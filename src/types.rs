@@ -1,7 +1,11 @@
 use std::fmt;
 
 use flagset::{flags, FlagSet};
-use fundsp::hacker32::*;
+use fundsp::hacker32::{
+    clamp, clamp01, constant, dc, flanger, fract, highpole, lerp, lerp11, lfo, lfo2, lowpole,
+    lowpole_hz, map, pass, pinkpass, round, sin_hz, sine, sink, An, AttoHash, AudioNode,
+    AudioUnit32, Float, Frame, Net32, Num, Sine, Wave32, DEFAULT_SR, U0, U1,
+};
 use funutd::Rnd;
 
 use crate::osc;
@@ -231,7 +235,9 @@ impl Pitch {
             }
 
             //println!("t: {t} t_r: {t_repeat} len: {}", (1.0 / len1));
-            f.max(0.0)
+
+            // Return the frequency and repeat cycle.
+            (f.max(0.0), t_repeat)
         }))
     }
 }
@@ -343,29 +349,33 @@ impl Tone {
         }
     }
 
-    pub fn to_net(self, len1: f32) -> Net32 {
+    pub fn to_net(self, _len1: f32) -> Net32 {
+        // The second input is the repeat cycle which only the square wave uses (for now). So every
+        // other waveform gets stacked with a sink.
+        let sink = wrap(sink());
+
         match self.waveform {
-            Waveform::Sine => wrap(sine()),
-            Waveform::Triangle => wrap(osc::triangle()),
-            Waveform::Saw => wrap(osc::saw()),
+            Waveform::Sine => sine() | sink,
+            Waveform::Triangle => osc::triangle() | sink,
+            Waveform::Saw => osc::saw() | sink,
             Waveform::Square => {
-                // Duty sweep should repeat w/ the frequency repeat...
-                let duty = wrap(lfo(move |t| {
+                // Square duty sweep repeats with frequency repeat cycle.
+                let duty = wrap(lfo2(move |_t, r| {
                     lerp(
                         0.01,
                         0.99,
-                        self.square_duty + self.square_duty_sweep * t * len1,
+                        self.square_duty + self.square_duty_sweep * r, //t * len1,
                     )
                 }));
                 (pass() | duty) >> osc::square()
             }
-            Waveform::Tangent => wrap(osc::tangent()),
-            Waveform::Whistle => wrap(osc::whistle()),
-            Waveform::Breaker => wrap(osc::breaker()),
-            Waveform::White => wrap(osc::white(self.interpolate_noise)),
-            Waveform::Pink => wrap(osc::white(self.interpolate_noise) >> pinkpass()),
+            Waveform::Tangent => osc::tangent() | sink,
+            Waveform::Whistle => osc::whistle() | sink,
+            Waveform::Breaker => osc::breaker() | sink,
+            Waveform::White => osc::white(self.interpolate_noise) | sink,
+            Waveform::Pink => osc::white(self.interpolate_noise) >> pinkpass() | sink,
             Waveform::Brown => {
-                wrap(osc::white(self.interpolate_noise) >> lowpole_hz(10.0) * dc(13.7))
+                wrap(osc::white(self.interpolate_noise) >> lowpole_hz(10.0) * dc(13.7)) | sink
             }
         }
     }
@@ -603,5 +613,35 @@ impl Filters {
         }
 
         f
+    }
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn square_duty_sweep_repeat() {
+        let asyn = Asyn {
+            pitch: Pitch {
+                frequency: 220.0,
+                repeat_frequency: 2.0,
+                ..Default::default()
+            },
+            tone: Tone {
+                waveform: Waveform::Square,
+                square_duty: 0.1,
+                square_duty_sweep: 0.9,
+                ..Default::default()
+            },
+            amplitude: Amplitude {
+                sustain: 2.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        asyn.to_wav()
+            .save_wav16("square_duty_sweep_repeat.wav")
+            .unwrap();
     }
 }
