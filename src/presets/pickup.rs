@@ -1,13 +1,11 @@
 use crate::{types::Amplitude, Asyn, Filters, Pitch, Tone, Waveform};
 
-pub fn pickup(seed: u64) -> Asyn {
+pub fn pickup(rng: &mut funutd::Rnd) -> Asyn {
     use Waveform::*;
 
-    let mut rng = funutd::Rnd::from_u64(seed);
-
     Asyn {
-        seed,
-        tone: Tone::pick(Sine | Square | Whistle | Breaker, &mut rng),
+        seed: rng.stream(),
+        tone: Tone::pick(Sine | Square | Whistle | Breaker, rng),
         amplitude: Amplitude {
             sustain: rng.f32_in(0.02, 0.1),
             punch: rng.bool(0.5).then(|| rng.f32()).unwrap_or_default(),

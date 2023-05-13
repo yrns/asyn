@@ -30,6 +30,7 @@ pub fn wrap(unit: impl AudioUnit32 + 'static) -> Net32 {
 #[derive(Debug, Default)]
 pub struct Asyn {
     pub seed: u64,
+    pub mutations: usize,
     pub pitch: Pitch,
     pub tone: Tone,
     pub amplitude: Amplitude,
@@ -37,6 +38,15 @@ pub struct Asyn {
 }
 
 impl Asyn {
+    pub fn mutate(mut self, rng: &mut Rnd) -> Self {
+        self.mutations += 1;
+        self.pitch = self.pitch.mutate(rng);
+        self.tone = self.tone.mutate(rng);
+        self.amplitude = self.amplitude.mutate(rng);
+        self.filters = Some(self.filters.unwrap_or_default().mutate(rng));
+        self
+    }
+
     pub fn len(&self) -> f32 {
         self.amplitude.len()
     }
@@ -48,6 +58,7 @@ impl Asyn {
             tone,
             amplitude,
             filters,
+            ..
         } = self;
 
         let len = amplitude.len();
@@ -72,11 +83,7 @@ impl Asyn {
 
 impl fmt::Display for Asyn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "seed: {} [{}] [{}] [{}]",
-            self.seed, self.pitch, self.tone, self.amplitude
-        )?;
+        write!(f, "[{}] [{}] [{}]", self.pitch, self.tone, self.amplitude)?;
         if let Some(filters) = self.filters.as_ref() {
             write!(f, "[{}]", filters)?;
         }
@@ -84,7 +91,7 @@ impl fmt::Display for Asyn {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug)]
 pub struct Pitch {
     pub frequency: f32,
     pub frequency_sweep: f32,
@@ -95,6 +102,26 @@ pub struct Pitch {
     pub repeat_frequency: f32,
     pub frequency_jump1: (f32, f32), // onset %, amount %
     pub frequency_jump2: (f32, f32),
+}
+
+const FREQUENCY_DEFAULT: f32 = 500.0;
+const VIBRATO_FREQUENCY_DEFAULT: f32 = 10.0;
+const FREQUENCY_JUMP1_ONSET_DEFAULT: f32 = 0.33;
+const FREQUENCY_JUMP2_ONSET_DEFAULT: f32 = 0.66;
+
+impl Default for Pitch {
+    fn default() -> Self {
+        Self {
+            frequency: FREQUENCY_DEFAULT,
+            frequency_sweep: 0.0,
+            frequency_delta_sweep: 0.0,
+            vibrato_depth: 0.0,
+            vibrato_frequency: VIBRATO_FREQUENCY_DEFAULT,
+            repeat_frequency: 0.0,
+            frequency_jump1: (FREQUENCY_JUMP1_ONSET_DEFAULT, 0.0),
+            frequency_jump2: (FREQUENCY_JUMP2_ONSET_DEFAULT, 0.0),
+        }
+    }
 }
 
 impl fmt::Display for Pitch {
@@ -128,7 +155,45 @@ impl fmt::Display for Pitch {
     }
 }
 
+/// Round to multiple of.
+pub fn round_to<T: Float>(f: T, mult: T) -> T {
+    round(f / mult) * mult
+}
+
+macro_rules! mutate_f32 {
+    ($i:expr, $rng:expr, $def:expr, $min:literal, $max:literal, $step:literal) => {
+        if $i != $def || $rng.bool(0.3) {
+            let range = 0.05 * ($max - $min);
+            //let prev = $i;
+            $i = clamp($min, $max, round_to($i + $rng.f32_in(-range, range), $step));
+            //println!("mutate_f32: {} {} -> {}", $i != $def, prev, $i);
+        }
+    };
+}
+
+// TODO: step for initial random values?
+
 impl Pitch {
+    pub fn mutate(mut self, rng: &mut Rnd) -> Self {
+        #[rustfmt::skip]
+        mutate_f32!(self.frequency, rng, FREQUENCY_DEFAULT, 10.0, 10_000.0, 100.0);
+        mutate_f32!(self.frequency_sweep, rng, 0.0, -10_000.0, 10_000.0, 100.0);
+        #[rustfmt::skip]
+        mutate_f32!(self.frequency_delta_sweep, rng, 0.0, -10_000.0, 10_000.0, 100.0);
+        mutate_f32!(self.vibrato_depth, rng, 0.0, 0.0, 1_000.0, 10.0);
+        #[rustfmt::skip]
+        mutate_f32!(self.vibrato_frequency, rng, VIBRATO_FREQUENCY_DEFAULT, 0.0, 1_000.0, 1.0);
+        mutate_f32!(self.repeat_frequency, rng, 0.0, 0.0, 100.0, 0.1);
+        #[rustfmt::skip]
+        mutate_f32!(self.frequency_jump1.0, rng, FREQUENCY_JUMP1_ONSET_DEFAULT, 0.0, 1.0, 0.05);
+        mutate_f32!(self.frequency_jump1.1, rng, 0.0, 0.0, 1.0, 0.05);
+        #[rustfmt::skip]
+        mutate_f32!(self.frequency_jump2.0, rng, FREQUENCY_JUMP2_ONSET_DEFAULT, 0.0, 1.0, 0.05);
+        mutate_f32!(self.frequency_jump2.1, rng, 0.0, 0.0, 1.0, 0.05);
+
+        self
+    }
+
     // The first few t values are 0. Is this a bug with the envelope?
     pub fn to_net(self, len1: f32) -> Net32 {
         let erf = self.repeat_frequency.max(len1);
@@ -196,7 +261,7 @@ impl Waveform {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Tone {
     pub waveform: Waveform,
     pub interpolate_noise: bool,
@@ -206,13 +271,26 @@ pub struct Tone {
     pub harmonics_falloff: f32,
 }
 
+impl Default for Tone {
+    fn default() -> Self {
+        Self {
+            waveform: Waveform::Sine,
+            interpolate_noise: true,
+            square_duty: 0.5,
+            square_duty_sweep: 0.0,
+            harmonics: 0,
+            harmonics_falloff: 0.5,
+        }
+    }
+}
+
 impl fmt::Display for Tone {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "tone: {:?}", self.waveform)?;
         if self.interpolate_noise {
             write!(f, " interp")?;
         }
-        if matches!(self.waveform, Waveform::Square) && self.square_duty > 0.0 {
+        if matches!(self.waveform, Waveform::Square) && self.square_duty != 0.5 {
             write!(
                 f,
                 " duty: {:.2} sweep: {:.2}",
@@ -231,6 +309,21 @@ impl fmt::Display for Tone {
 }
 
 impl Tone {
+    pub fn mutate(mut self, rng: &mut Rnd) -> Self {
+        // TODO: waveform from original set
+
+        if rng.bool(0.1) {
+            self.interpolate_noise = !self.interpolate_noise;
+        }
+
+        mutate_f32!(self.square_duty, rng, 0.5, 0.0, 1.0, 0.05);
+        mutate_f32!(self.square_duty_sweep, rng, 0.0, -1.0, 1.0, 0.05);
+
+        self.harmonics = clamp(0, 5, self.harmonics as i32 + i32_in(rng, -1, 1)) as u32;
+        mutate_f32!(self.harmonics_falloff, rng, 0.5, 0.0, 1.0, 0.01);
+        self
+    }
+
     pub fn pick(set: FlagSet<Waveform>, rng: &mut Rnd) -> Self {
         Self {
             waveform: Waveform::pick(set, rng),
@@ -324,6 +417,16 @@ impl fmt::Display for Amplitude {
 }
 
 impl Amplitude {
+    pub fn mutate(mut self, rng: &mut Rnd) -> Self {
+        mutate_f32!(self.attack, rng, 0.0, 0.0, 5.0, 0.01);
+        mutate_f32!(self.sustain, rng, 0.0, 0.0, 5.0, 0.01);
+        mutate_f32!(self.punch, rng, 0.0, 0.0, 1.0, 0.1);
+        mutate_f32!(self.decay, rng, 0.0, 0.0, 5.0, 0.01);
+        mutate_f32!(self.tremolo_depth, rng, 0.0, 0.0, 1.0, 0.01);
+        mutate_f32!(self.tremolo_frequency, rng, 10.0, 0.0, 1000.0, 1.0);
+        self
+    }
+
     pub fn len(&self) -> f32 {
         self.attack + self.sustain + self.decay
     }
@@ -363,8 +466,8 @@ pub fn aspd(amplitude: Amplitude, t: f32) -> f32 {
 pub struct Filters {
     pub flanger_offset: f32,
     pub flanger_offset_sweep: f32,
-    pub bit_crush: f32,
-    pub bit_crush_sweep: f32,
+    pub bit_crush: i32,
+    pub bit_crush_sweep: i32,
     pub low_pass_cutoff: f32,
     pub low_pass_sweep: f32,
     pub high_pass_cutoff: f32,
@@ -377,32 +480,30 @@ impl Default for Filters {
         Self {
             flanger_offset: 0.0,
             flanger_offset_sweep: 0.0,
-            bit_crush: 0.0,
-            bit_crush_sweep: 0.0,
+            bit_crush: 16,
+            bit_crush_sweep: 0,
             low_pass_cutoff: 22_050.0,
             low_pass_sweep: 0.0,
             high_pass_cutoff: 0.0,
             high_pass_sweep: 0.0,
             compression: 1.0,
+            //normalization: true,
+            //amplification: 1.0,
         }
     }
 }
 
 impl fmt::Display for Filters {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.flanger_offset > 0.0 {
+        if self.flanger_offset > 0.0 || self.flanger_offset_sweep != 0.0 {
             write!(
                 f,
                 " flanger: {:.1}/{:.1}",
                 self.flanger_offset, self.flanger_offset_sweep
             )?;
         }
-        if self.bit_crush > 0.0 {
-            write!(
-                f,
-                " bit_crush: {:.1}/{:.1}",
-                self.bit_crush, self.bit_crush_sweep
-            )?;
+        if self.bit_crush < 16 {
+            write!(f, " bit_crush: {}/{}", self.bit_crush, self.bit_crush_sweep)?;
         }
         if self.low_pass_cutoff < 22_050.0 || self.low_pass_sweep != 0.0 {
             write!(
@@ -425,7 +526,32 @@ impl fmt::Display for Filters {
     }
 }
 
+// https://github.com/SamiPerttu/funutd/issues/1
+#[inline]
+fn i32_in(rng: &mut Rnd, min: i32, max: i32) -> i32 {
+    min + rng.i32_in(0, max - min)
+}
+
 impl Filters {
+    pub fn mutate(mut self, rng: &mut Rnd) -> Self {
+        mutate_f32!(self.flanger_offset, rng, 0.0, 0.0, 50.0, 1.0);
+        mutate_f32!(self.flanger_offset_sweep, rng, 0.0, -50.0, 50.0, 1.0);
+
+        self.bit_crush = clamp(1, 16, self.bit_crush + i32_in(rng, -1, 1));
+        self.bit_crush_sweep = clamp(-16, 16, self.bit_crush_sweep + i32_in(rng, -1, 1));
+
+        mutate_f32!(self.low_pass_cutoff, rng, 22_050.0, 0.0, 22_050.0, 100.0);
+        mutate_f32!(self.low_pass_sweep, rng, 0.0, -22_050.0, 22_050.0, 100.0);
+        mutate_f32!(self.high_pass_cutoff, rng, 0.0, 0.0, 22_050.0, 100.0);
+        mutate_f32!(self.high_pass_sweep, rng, 0.0, -22_050.0, 22_050.0, 100.0);
+
+        mutate_f32!(self.compression, rng, 1.0, 0.0, 5.0, 0.1);
+
+        // Normalization/amplification don't mutate?
+
+        self
+    }
+
     pub fn to_net(self, len1: f32) -> Net32 {
         let mut f = wrap(pass());
 

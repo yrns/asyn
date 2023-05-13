@@ -1,10 +1,8 @@
 use crate::types::{Amplitude, Asyn, Filters, Pitch, Tone, Waveform};
 
-pub fn explosion(seed: u64) -> Asyn {
-    let mut rng = funutd::Rnd::from_u64(seed);
-
+pub fn explosion(rng: &mut funutd::Rnd) -> Asyn {
     let tone = Tone {
-        waveform: Waveform::pick(Waveform::White | Waveform::Pink | Waveform::Brown, &mut rng),
+        waveform: Waveform::pick(Waveform::White | Waveform::Pink | Waveform::Brown, rng),
         interpolate_noise: rng.bool(0.5),
         ..Default::default()
     };
@@ -43,10 +41,11 @@ pub fn explosion(seed: u64) -> Asyn {
     }
 
     Asyn {
-        seed,
+        seed: rng.stream(),
         pitch,
         tone,
         amplitude,
         filters: Some(f),
+        ..Default::default()
     }
 }

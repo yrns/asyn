@@ -1,9 +1,7 @@
 use crate::types::{Amplitude, Asyn, Filters, Pitch, Tone, Waveform};
 
-pub fn hit(seed: u64) -> Asyn {
+pub fn hit(rng: &mut funutd::Rnd) -> Asyn {
     use Waveform::*;
-
-    let mut rng = funutd::Rnd::from_u64(seed);
 
     let mut f = Filters {
         low_pass_sweep: rng.f32_in(-22_050.0, 22_050.0),
@@ -16,7 +14,7 @@ pub fn hit(seed: u64) -> Asyn {
     }
 
     Asyn {
-        seed,
+        seed: rng.stream(),
         pitch: Pitch {
             frequency: rng.f32_in(500.0, 1_000.0),
             frequency_sweep: rng.f32_in(-200.0, -1_000.0),
@@ -25,7 +23,7 @@ pub fn hit(seed: u64) -> Asyn {
         },
         tone: Tone::from(Waveform::pick(
             Saw | Square | Tangent | White | Pink | Brown,
-            &mut rng,
+            rng,
         )),
         amplitude: Amplitude {
             sustain: rng.f32_in(0.02, 0.1),
@@ -34,5 +32,6 @@ pub fn hit(seed: u64) -> Asyn {
             ..Default::default()
         },
         filters: Some(f),
+        ..Default::default()
     }
 }

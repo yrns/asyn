@@ -1,17 +1,15 @@
 use crate::{types::Amplitude, Asyn, Pitch, Tone, Waveform};
 
-pub fn blip(seed: u64) -> Asyn {
+pub fn blip(rng: &mut funutd::Rnd) -> Asyn {
     use Waveform::*;
 
-    let mut rng = funutd::Rnd::from_u64(seed);
-
     Asyn {
-        seed,
+        seed: rng.stream(),
         tone: {
             let mut tone = Tone {
                 waveform: Waveform::pick(
                     Sine | Triangle | Saw | Square | Tangent | Whistle | Breaker,
-                    &mut rng,
+                    rng,
                 ),
                 square_duty: rng.f32_in(0.1, 0.9),
                 ..Default::default()

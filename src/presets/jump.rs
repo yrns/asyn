@@ -1,8 +1,6 @@
 use crate::types::{Amplitude, Asyn, Filters, Pitch, Tone, Waveform};
 
-pub fn jump(seed: u64) -> Asyn {
-    let mut rng = funutd::Rnd::from_u64(seed);
-
+pub fn jump(rng: &mut funutd::Rnd) -> Asyn {
     let mut filters = Filters::default();
 
     // Flanger.
@@ -24,6 +22,7 @@ pub fn jump(seed: u64) -> Asyn {
     }
 
     Asyn {
+        seed: rng.stream(),
         amplitude: Amplitude {
             sustain: rng.f32_in(0.02, 0.1),
             decay: rng.f32_in(0.05, 0.4),
@@ -39,7 +38,7 @@ pub fn jump(seed: u64) -> Asyn {
 
         tone: Tone::pick(
             Waveform::Sine | Waveform::Square | Waveform::Whistle | Waveform::Breaker,
-            &mut rng,
+            rng,
         ),
         filters: Some(filters),
         ..Default::default()

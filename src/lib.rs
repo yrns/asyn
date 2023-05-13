@@ -48,7 +48,13 @@ mod tests {
         // .to_net(1.0)
         //     >> Tone::from(Waveform::Triangle).to_net(1.0);
 
-        blip(funutd::Rnd::from_time().u64())
+        //let mut rng = funutd::Rnd::from_time();
+        let seed = 2701585528853860150; //rng.u64();
+        let rng = &mut funutd::Rnd::from_u64(seed);
+        println!("seed: {}", seed);
+        blip(rng)
+            .mutate(rng)
+            .mutate(rng)
             .to_wav()
             .save_wav16("test.wav")
             .unwrap();
