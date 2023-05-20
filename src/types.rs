@@ -4,7 +4,7 @@ use flagset::{flags, FlagSet};
 use fundsp::hacker32::{
     clamp, clamp01, constant, dc, flanger, fract, highpole, lerp, lerp11, lfo, lfo2, lowpole,
     lowpole_hz, map, pass, pinkpass, round, sin_hz, sine, sink, An, AttoHash, AudioNode,
-    AudioUnit32, Float, Frame, Net32, Num, Sine, Wave32, DEFAULT_SR, U0, U1,
+    AudioUnit32, Float, Frame, Net32, Num, Sine, Wave32, DEFAULT_SR, U0, U1, U2,
 };
 use funutd::Rnd;
 
@@ -585,6 +585,16 @@ impl Filters {
                 });
         }
 
+        if self.bit_crush != 0 || self.bit_crush_sweep != 0 {
+            f = (f | lfo(move |t| self.bit_crush as f32 + self.bit_crush_sweep as f32 * t * len1))
+                >> map(move |f: &Frame<f32, U2>| {
+                    let sample = f[0];
+                    let bits = clamp(1, 16, round(f[1]) as u32);
+                    let steps = 2.pow(bits) as f32;
+                    -1.0 + 2.0 * round((0.5 + 0.5 * sample) * steps) / steps
+                });
+        }
+
         if self.low_pass_cutoff < 22_050.0 {
             f = (f | lfo(move |t| {
                 clamp(
@@ -650,5 +660,32 @@ mod tests {
         asyn.to_wav()
             .save_wav16("square_duty_sweep_repeat.wav")
             .unwrap();
+    }
+
+    #[test]
+    fn bit_crush() {
+        let asyn = Asyn {
+            pitch: Pitch {
+                frequency: 110.0,
+                ..Default::default()
+            },
+            tone: Tone {
+                waveform: Waveform::Triangle,
+                harmonics: 4,
+                harmonics_falloff: 0.9,
+                ..Default::default()
+            },
+            amplitude: Amplitude {
+                sustain: 0.1,
+                ..Default::default()
+            },
+            filters: Some(Filters {
+                bit_crush: 4,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        asyn.to_wav().save_wav16("4bit.wav").unwrap();
     }
 }
