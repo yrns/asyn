@@ -354,7 +354,7 @@ impl Tone {
         // other waveform gets stacked with a sink.
         let sink = wrap(sink());
 
-        match self.waveform {
+        let wave = match self.waveform {
             Waveform::Sine => sine() | sink,
             Waveform::Triangle => osc::triangle() | sink,
             Waveform::Saw => osc::saw() | sink,
@@ -377,6 +377,12 @@ impl Tone {
             Waveform::Brown => {
                 wrap(osc::white(self.interpolate_noise) >> lowpole_hz(10.0) * dc(13.7)) | sink
             }
+        };
+
+        if self.harmonics > 0 {
+            osc::harmonic(wave, self.harmonics, self.harmonics_falloff)
+        } else {
+            wave
         }
     }
 }
@@ -616,6 +622,7 @@ impl Filters {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

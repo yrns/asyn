@@ -358,3 +358,31 @@ impl<T: Float> AudioNode for Noise<T> {
         output
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    #[test]
+    fn harmonic() {
+        let asyn = Asyn {
+            pitch: Pitch {
+                frequency: 110.0,
+                ..Default::default()
+            },
+            tone: Tone {
+                waveform: Waveform::Triangle,
+                harmonics: 2,
+                harmonics_falloff: 0.9,
+                ..Default::default()
+            },
+            amplitude: Amplitude {
+                sustain: 0.1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        asyn.to_wav().save_wav16("harmonic.wav").unwrap();
+    }
+}
