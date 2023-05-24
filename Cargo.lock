@@ -37,7 +37,7 @@ dependencies = [
  "cpal",
  "flagset",
  "fundsp",
- "funutd",
+ "funutd 0.12.0",
  "numeric-array",
 ]
 
@@ -244,7 +244,7 @@ checksum = "f2be1a96872d4d7d6dfdbcda462e1cbfed95e79a4b1f79b8599f88aa2f7a4e91"
 dependencies = [
  "duplicate",
  "dyn-clone",
- "funutd",
+ "funutd 0.11.0",
  "generic-array",
  "lazy_static",
  "num-complex",
@@ -263,7 +263,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e7b55f616d61720072602e7a85e451bad712a6cfce29189c30e71ad0c0d565d"
 dependencies = [
  "dyn-clone",
- "glam",
+ "glam 0.22.0",
+]
+
+[[package]]
+name = "funutd"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0e85866c03c16e44a8979dd37e3f3034436b09951873ceb35329e1a3535ad11"
+dependencies = [
+ "dyn-clone",
+ "glam 0.24.0",
 ]
 
 [[package]]
@@ -281,6 +291,12 @@ name = "glam"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12f597d56c1bd55a811a1be189459e8fad2bbc272616375602443bdfb37fa774"
+
+[[package]]
+name = "glam"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad83ab008a4fa3b31dfa713dd41b5a9bdea1e94e4cf1e2fc274ffbd49b0271d3"
 
 [[package]]
 name = "glob"

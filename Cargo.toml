@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 fundsp = { version = "0.13.0" } 
 #path = "../clone/fundsp"
-funutd = "0.11.0"
+funutd = "0.12.0"
 cpal = "0.15.2"
 numeric-array = { version = "0.5.2", default-features = false }
 flagset = "0.4.3"
