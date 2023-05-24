@@ -9,6 +9,7 @@ pub mod presets {
     pub mod laser;
     pub mod pickup;
     pub mod powerup;
+    pub mod random;
 
     pub use blip::*;
     pub use explosion::*;
@@ -17,6 +18,7 @@ pub mod presets {
     pub use laser::*;
     pub use pickup::*;
     pub use powerup::*;
+    pub use random::*;
 }
 
 pub use osc::*;
@@ -48,16 +50,12 @@ mod tests {
         // .to_net(1.0)
         //     >> Tone::from(Waveform::Triangle).to_net(1.0);
 
-        //let mut rng = funutd::Rnd::from_time();
-        let seed = 2701585528853860150; //rng.u64();
+        let mut rng = funutd::Rnd::from_time();
+        let seed = rng.u64();
         let rng = &mut funutd::Rnd::from_u64(seed);
         println!("seed: {}", seed);
-        blip(rng)
-            .mutate(rng)
-            .mutate(rng)
-            .to_wav()
-            .save_wav16("test.wav")
-            .unwrap();
+
+        random(rng).to_wav().save_wav16("test.wav").unwrap();
         //wav.write_wav16(&mut std::io::stdout().lock()).unwrap();
     }
 }
